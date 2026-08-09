@@ -1,5 +1,3 @@
-const CLAUDE_URL = "https://api.anthropic.com/v1/messages";
-
 function stripJsonFence(text = "") {
   return text.trim()
     .replace(/^```json\s*/i, "")
@@ -25,9 +23,16 @@ function anthropicText(out) {
 
 async function callAnthropic({ prompt, maxTokens, webSearch = false, maxSearches = 8 }) {
   const key = normalizeSecret(process.env.ANTHROPIC_API_KEY);
-  if (!key) throw new Error("ANTHROPIC_API_KEY is not configured in Netlify.");
+  if (!key) {
+    throw new Error("No Anthropic credential is available. If using Netlify AI Gateway, make sure AI Features are enabled and redeploy the site.");
+  }
 
+  const baseUrl = String(process.env.ANTHROPIC_BASE_URL || "https://api.anthropic.com")
+    .trim()
+    .replace(/\/$/, "");
+  const usingNetlifyGateway = Boolean(process.env.ANTHROPIC_BASE_URL);
   const model = process.env.ANTHROPIC_MODEL || "claude-sonnet-5";
+
   const body = {
     model,
     max_tokens: maxTokens,
@@ -48,7 +53,7 @@ async function callAnthropic({ prompt, maxTokens, webSearch = false, maxSearches
     }];
   }
 
-  const r = await fetch(CLAUDE_URL, {
+  const r = await fetch(`${baseUrl}/v1/messages`, {
     method: "POST",
     headers: {
       "content-type": "application/json",
@@ -61,16 +66,24 @@ async function callAnthropic({ prompt, maxTokens, webSearch = false, maxSearches
   if (!r.ok) {
     const text = await r.text();
     if (r.status === 401) {
-      throw new Error("Anthropic rejected the API key. In Netlify, ANTHROPIC_API_KEY must contain only the API key value itself (normally beginning sk-ant-), with no ANTHROPIC_API_KEY= prefix. " + text.slice(0, 500));
+      throw new Error(
+        usingNetlifyGateway
+          ? `Netlify AI Gateway authentication failed. ${text.slice(0, 500)}`
+          : `Anthropic rejected the API key. ${text.slice(0, 500)}`
+      );
     }
-    throw new Error(`Anthropic API ${r.status}: ${text.slice(0, 700)}`);
+    throw new Error(`${usingNetlifyGateway ? "Netlify AI Gateway" : "Anthropic API"} ${r.status}: ${text.slice(0, 700)}`);
   }
 
   const out = await r.json();
   const text = anthropicText(out);
   if (!text) throw new Error("Anthropic returned no text output.");
 
-  return { provider: "anthropic", model, text: stripJsonFence(text) };
+  return {
+    provider: usingNetlifyGateway ? "anthropic via netlify" : "anthropic",
+    model,
+    text: stripJsonFence(text)
+  };
 }
 
 export async function generateJson(prompt, maxTokens = 5000) {
