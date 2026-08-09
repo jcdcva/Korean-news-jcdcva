@@ -25,7 +25,13 @@ function blockTypes(out) {
   return (out.content || []).map(x => x?.type || "unknown").join(", ") || "none";
 }
 
-async function callAnthropic({ prompt, maxTokens, webSearch = false, maxSearches = 8 }) {
+async function callAnthropic({
+  prompt,
+  maxTokens,
+  webSearch = false,
+  maxSearches = 8,
+  outputSchema = null
+}) {
   const key = normalizeSecret(process.env.ANTHROPIC_API_KEY);
   if (!key) {
     throw new Error("No Anthropic credential is available. If using Netlify AI Gateway, make sure AI Features are enabled and redeploy the site.");
@@ -61,6 +67,14 @@ async function callAnthropic({ prompt, maxTokens, webSearch = false, maxSearches
       messages
     };
     if (allowSearch && searchTools) body.tools = searchTools;
+    if (outputSchema && !allowSearch) {
+      body.output_config = {
+        format: {
+          type: "json_schema",
+          schema: outputSchema
+        }
+      };
+    }
 
     const r = await fetch(`${baseUrl}/v1/messages`, {
       method: "POST",
@@ -88,15 +102,11 @@ async function callAnthropic({ prompt, maxTokens, webSearch = false, maxSearches
     const piece = anthropicText(out);
     if (piece) textParts.push(piece);
 
-    // Anthropic server tools can explicitly pause a long-running turn.
-    // Re-send the assistant content unchanged with the same tools so it can resume.
     if (out.stop_reason === "pause_turn") {
       messages.push({ role: "assistant", content: out.content || [] });
       continue;
     }
 
-    // If generation hit the token limit, preserve what Claude already emitted and
-    // ask it to continue. This also protects against a partially emitted JSON object.
     if (out.stop_reason === "max_tokens") {
       messages.push({ role: "assistant", content: out.content || [] });
       messages.push({
@@ -120,9 +130,6 @@ async function callAnthropic({ prompt, maxTokens, webSearch = false, maxSearches
       };
     }
 
-    // A search-heavy turn can complete with server_tool_use/search-result blocks
-    // but no final text. Treat the research as completed context, then make a clean
-    // synthesis turn without tools so Claude must write the requested JSON.
     if (webSearch && !synthesisRetryUsed) {
       messages.push({ role: "assistant", content: out.content || [] });
       messages.push({
@@ -142,13 +149,43 @@ async function callAnthropic({ prompt, maxTokens, webSearch = false, maxSearches
   throw new Error("Anthropic did not complete the briefing after several continuation attempts.");
 }
 
-export async function generateJson(prompt, maxTokens = 5000) {
-  const result = await callAnthropic({ prompt, maxTokens, webSearch: false });
-  const json = JSON.parse(result.text);
+async function parseJsonWithRepair(result, schema, maxTokens) {
+  try {
+    return JSON.parse(result.text);
+  } catch (parseError) {
+    if (!schema) throw parseError;
+
+    const repairPrompt = `The text below was intended to be JSON but contains a syntax error or was imperfectly continued. Repair it into a valid JSON object matching the required schema. Preserve the factual content and source URLs already present. Do not invent new facts or sources. If a malformed or truncated item cannot be safely recovered, omit that item rather than guessing. Return only the repaired JSON.\n\nMALFORMED OUTPUT:\n${result.text}`;
+
+    const repaired = await callAnthropic({
+      prompt: repairPrompt,
+      maxTokens: Math.max(maxTokens, 7000),
+      webSearch: false,
+      outputSchema: schema
+    });
+
+    try {
+      return JSON.parse(repaired.text);
+    } catch (repairError) {
+      throw new Error(
+        `Claude produced the briefing but its JSON could not be repaired automatically. Original parse error: ${parseError.message}`
+      );
+    }
+  }
+}
+
+export async function generateJson(prompt, maxTokens = 5000, schema = null) {
+  const result = await callAnthropic({
+    prompt,
+    maxTokens,
+    webSearch: false,
+    outputSchema: schema
+  });
+  const json = await parseJsonWithRepair(result, schema, maxTokens);
   return { ...json, _ai: { provider: result.provider, model: result.model } };
 }
 
-export async function generateJsonWithWeb(prompt, maxTokens = 6000, maxSearches = 10) {
+export async function generateJsonWithWeb(prompt, maxTokens = 6000, maxSearches = 10, schema = null) {
   const result = await callAnthropic({
     prompt,
     maxTokens,
@@ -156,6 +193,6 @@ export async function generateJsonWithWeb(prompt, maxTokens = 6000, maxSearches 
     maxSearches
   });
 
-  const json = JSON.parse(result.text);
+  const json = await parseJsonWithRepair(result, schema, maxTokens);
   return { ...json, _ai: { provider: result.provider, model: result.model } };
 }
