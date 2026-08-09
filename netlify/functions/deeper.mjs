@@ -1,102 +1,33 @@
-import { generateJson } from "./_shared/ai.mjs";
+import { generateJsonWithWeb } from "./_shared/ai.mjs";
 
-const NAVER_URL = "https://naverapihub.apigw.ntruss.com/search/v1/news";
-
-function clean(s = "") {
-  return s
-    .replace(/<[^>]*>/g, "")
-    .replace(/&quot;/g, '"')
-    .replace(/&apos;/g, "'")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&amp;/g, "&")
-    .trim();
-}
-
-function outletFromUrl(url = "") {
-  try {
-    const host = new URL(url).hostname.replace(/^www\./, "");
-    const known = {
-      "yna.co.kr":"연합뉴스", "hani.co.kr":"한겨레", "khan.co.kr":"경향신문",
-      "chosun.com":"조선일보", "joongang.co.kr":"중앙일보", "donga.com":"동아일보",
-      "hankookilbo.com":"한국일보", "mk.co.kr":"매일경제", "sedaily.com":"서울경제",
-      "newsis.com":"뉴시스", "ytn.co.kr":"YTN", "kbs.co.kr":"KBS", "mbc.co.kr":"MBC", "sbs.co.kr":"SBS"
-    };
-    return known[host] || host;
-  } catch { return "Unknown"; }
-}
-
-async function naverSearch(query, display = 40) {
-  const id = process.env.NAVER_CLIENT_ID;
-  const secret = process.env.NAVER_CLIENT_SECRET;
-  if (!id || !secret) throw new Error("Missing Naver API credentials.");
-
-  const u = new URL(NAVER_URL);
-  u.searchParams.set("query", query);
-  u.searchParams.set("display", String(display));
-  u.searchParams.set("sort", "date");
-  u.searchParams.set("format", "json");
-
-  const r = await fetch(u, {
-    headers: {
-      "X-NCP-APIGW-API-KEY-ID": id,
-      "X-NCP-APIGW-API-KEY": secret
-    }
-  });
-  if (!r.ok) throw new Error(`Naver API ${r.status}: ${(await r.text()).slice(0,500)}`);
-  return r.json();
-}
-
-function dedupe(items) {
-  const seen = new Set();
-  return items.map(item => {
-    const url = item.originallink || item.link || "";
-    return {
-      title: clean(item.title),
-      snippet: clean(item.description),
-      url,
-      outlet: outletFromUrl(url || item.link),
-      pubDate: item.pubDate
-    };
-  }).filter(x => {
-    const key = (x.url || x.title).replace(/[#?].*$/, "");
-    if (!key || seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-}
-
-async function analyze(story, articles) {
+async function analyze(story) {
   const prompt = `You are producing the "Go deeper" section for Korean Morning Papers.
 
-The user has already read a short English briefing. Your job is to provide a richer, more nuanced explanation using ONLY the Korean-language news metadata below.
+The reader has already seen this short briefing:
+${JSON.stringify(story)}
 
-Be analytical but cautious. Distinguish:
-- facts in the supplied material,
-- background/context,
-- interpretations or framing,
+Use live web search to investigate this specific story more deeply. Search Korean-language reporting first, using the Korean headline when available, and consult several reputable Korean outlets where possible. Focus on current reporting plus only the background needed to understand the issue.
+
+Be analytical but cautious. Separate:
+- well-supported current facts,
+- relevant background/context,
+- competing interpretations or framing,
 - genuine uncertainty.
 
-Do not invent quotations or facts. Do not copy long text from articles. Where outlets differ, describe the observable difference in emphasis without stereotyping the publication.
+Do not invent quotations, facts, disagreements, or URLs. Do not copy long passages. If reporting is thin or contradictory, say so clearly.
 
-Return ONLY valid JSON:
+Return ONLY valid JSON, no Markdown:
 {
   "headline":"clear English title",
-  "overview":"one substantial paragraph, 120-180 words",
+  "overview":"one substantial paragraph, about 120-180 words",
   "background":["3-5 concise bullets"],
   "nuances":["3-5 concise bullets about tensions, tradeoffs, or differing interpretations"],
   "uncertainty":["1-3 bullets on unresolved or unclear points"],
   "watch":["2-4 bullets on what developments would matter next"],
   "sources":[{"name":"outlet","url":"https://..."}]
-}
+}`;
 
-EXISTING SHORT BRIEFING:
-${JSON.stringify(story)}
-
-ADDITIONAL KOREAN COVERAGE:
-${JSON.stringify(articles.slice(0, 35))}`;
-
-  return generateJson(prompt, 4500);
+  return generateJsonWithWeb(prompt, 5200, 8);
 }
 
 export default async function handler(req) {
@@ -109,21 +40,13 @@ export default async function handler(req) {
 
   try {
     const story = await req.json();
-    const query = (story.title_ko || story.title_en || "").trim();
-    if (!query) throw new Error("Story title missing.");
+    if (!(story?.title_ko || story?.title_en)) throw new Error("Story title missing.");
 
-    const result = await naverSearch(query, 40);
-    const articles = dedupe(result.items || []);
-    if (!articles.length) throw new Error("No additional Korean coverage found.");
-
-    const deep = await analyze(story, articles);
+    const deep = await analyze(story);
     const ai = deep._ai;
     delete deep._ai;
 
-    if (!Array.isArray(deep.sources) || !deep.sources.length) {
-      deep.sources = articles.slice(0, 6).map(a => ({name:a.outlet, url:a.url}));
-    }
-    deep.aiProvider = ai?.provider || "unknown";
+    deep.aiProvider = ai?.provider || "anthropic";
     deep.aiModel = ai?.model || "unknown";
 
     return new Response(JSON.stringify(deep), {
