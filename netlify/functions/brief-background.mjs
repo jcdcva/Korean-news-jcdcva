@@ -3,6 +3,76 @@ import { generateJsonWithWeb } from "./_shared/ai.mjs";
 
 const STORE_NAME = "korean-morning-papers";
 
+const BRIEFING_SCHEMA = {
+  type: "object",
+  properties: {
+    stories: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          rank: { type: "integer" },
+          category: { type: "string" },
+          title_en: { type: "string" },
+          title_ko: { type: "string" },
+          summary: { type: "string" },
+          why: { type: "string" },
+          sources: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                name: { type: "string" },
+                url: { type: "string" }
+              },
+              required: ["name", "url"],
+              additionalProperties: false
+            }
+          },
+          viewpoints: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                outlet: { type: "string" },
+                text: { type: "string" }
+              },
+              required: ["outlet", "text"],
+              additionalProperties: false
+            }
+          }
+        },
+        required: ["rank", "category", "title_en", "title_ko", "summary", "why", "sources", "viewpoints"],
+        additionalProperties: false
+      }
+    },
+    life: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          title: { type: "string" },
+          korean: { type: "string" },
+          text: { type: "string" },
+          source: {
+            type: "object",
+            properties: {
+              name: { type: "string" },
+              url: { type: "string" }
+            },
+            required: ["name", "url"],
+            additionalProperties: false
+          }
+        },
+        required: ["title", "korean", "text", "source"],
+        additionalProperties: false
+      }
+    }
+  },
+  required: ["stories", "life"],
+  additionalProperties: false
+};
+
 function store() {
   return getStore({ name: STORE_NAME, consistency: "strong" });
 }
@@ -26,31 +96,9 @@ TASK
 9. Do not invent facts, quotations, headlines, source URLs, or disagreements. If a point is uncertain, say so.
 10. Do not reproduce long copyrighted passages. Summaries must be original.
 
-Return ONLY valid JSON, no Markdown, with this schema:
-{
-  "stories":[
-    {
-      "rank":1,
-      "category":"Politics",
-      "title_en":"...",
-      "title_ko":"...",
-      "summary":"2-3 concise sentences",
-      "why":"1-2 sentences",
-      "sources":[{"name":"연합뉴스","url":"https://..."}],
-      "viewpoints":[{"outlet":"...","text":"Emphasizes ..."}]
-    }
-  ],
-  "life":[
-    {
-      "title":"English title",
-      "korean":"Korean headline or short Korean label",
-      "text":"2-3 sentences",
-      "source":{"name":"outlet","url":"https://..."}
-    }
-  ]
-}`;
+Return only the requested structured briefing.`;
 
-  return generateJsonWithWeb(prompt, 7000, 12);
+  return generateJsonWithWeb(prompt, 7000, 12, BRIEFING_SCHEMA);
 }
 
 function normalizeBriefing(briefing) {
