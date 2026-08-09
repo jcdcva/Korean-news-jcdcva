@@ -1,6 +1,9 @@
 {
   "name": "korean-morning-papers",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
-  "description": "Korean Morning Papers — Naver news with OpenAI/Anthropic analysis"
+  "description": "Korean Morning Papers — live Korean news briefing with Anthropic web search on Netlify",
+  "dependencies": {
+    "@netlify/blobs": "^10.7.10"
+  }
 }
