@@ -8,6 +8,13 @@ function stripJsonFence(text = "") {
     .trim();
 }
 
+function normalizeSecret(value = "") {
+  return String(value)
+    .trim()
+    .replace(/^['"]|['"]$/g, "")
+    .trim();
+}
+
 function anthropicText(out) {
   return (out.content || [])
     .filter(x => x.type === "text")
@@ -17,7 +24,7 @@ function anthropicText(out) {
 }
 
 async function callAnthropic({ prompt, maxTokens, webSearch = false, maxSearches = 8 }) {
-  const key = process.env.ANTHROPIC_API_KEY;
+  const key = normalizeSecret(process.env.ANTHROPIC_API_KEY);
   if (!key) throw new Error("ANTHROPIC_API_KEY is not configured in Netlify.");
 
   const model = process.env.ANTHROPIC_MODEL || "claude-sonnet-5";
@@ -53,6 +60,9 @@ async function callAnthropic({ prompt, maxTokens, webSearch = false, maxSearches
 
   if (!r.ok) {
     const text = await r.text();
+    if (r.status === 401) {
+      throw new Error("Anthropic rejected the API key. In Netlify, ANTHROPIC_API_KEY must contain only the API key value itself (normally beginning sk-ant-), with no ANTHROPIC_API_KEY= prefix. " + text.slice(0, 500));
+    }
     throw new Error(`Anthropic API ${r.status}: ${text.slice(0, 700)}`);
   }
 
