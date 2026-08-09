@@ -9,6 +9,25 @@ const PATCH = `<script>
   const err = document.getElementById("error");
   const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
+  function setKoreaDateLabel() {
+    const el = document.getElementById("date");
+    if (!el) return;
+    try {
+      const instant = data?.generatedAt ? new Date(data.generatedAt) : new Date();
+      const koreaDate = new Intl.DateTimeFormat("en-US", {
+        timeZone: "Asia/Seoul",
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+        year: "numeric"
+      }).format(instant);
+      el.textContent = \`Korea news date · \${koreaDate}\`;
+      el.title = "Calendar date in South Korea (Asia/Seoul) for this briefing";
+    } catch {
+      el.textContent = "Korea news date";
+    }
+  }
+
   async function responseJson(r) {
     const text = await r.text();
     if (!text) return {};
@@ -61,11 +80,13 @@ const PATCH = `<script>
         mode: "live"
       };
       render();
+      setKoreaDateLabel();
     } catch (e) {
       err.textContent = e.message + " Showing the built-in demo instead.";
       err.classList.remove("hidden");
       data = DEMO;
       render();
+      setKoreaDateLabel();
     } finally {
       btn.disabled = false;
       btn.textContent = "↻ Refresh briefing";
@@ -119,6 +140,9 @@ const PATCH = `<script>
       deepBtn.disabled = false;
     }
   };
+
+  // Make the timezone explicit even before the first live refresh.
+  setKoreaDateLabel();
 })();
 </script>`;
 
