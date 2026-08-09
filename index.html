@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="theme-color" content="#f7f4ee" />
+  <title>Korean Morning Papers</title>
+  <style>
+    :root{
+      --ink:#17211d; --muted:#65706b; --paper:#f7f4ee; --card:#fffdf8;
+      --line:#ded9cf; --accent:#b4232f; --accent2:#173f35; --soft:#ece7dd;
+      --shadow:0 12px 30px rgba(27,34,31,.08);
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--paper);color:var(--ink)}
+    a{color:inherit}
+    button{font:inherit}
+    .shell{max-width:1040px;margin:auto;padding:20px}
+    header{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;border-bottom:1px solid var(--line);padding:14px 0 22px}
+    .eyebrow{font-size:.76rem;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);font-weight:800}
+    h1{font-family:Georgia,"Times New Roman",serif;font-size:clamp(2rem,6vw,4.25rem);line-height:.96;margin:.28rem 0 .55rem;letter-spacing:-.035em}
+    .dek{max-width:670px;color:var(--muted);font-size:1.05rem;line-height:1.55}
+    .refresh{border:1px solid var(--ink);background:var(--ink);color:white;border-radius:999px;padding:11px 16px;cursor:pointer;white-space:nowrap}
+    .refresh[disabled]{opacity:.55;cursor:wait}
+    .statusbar{display:flex;flex-wrap:wrap;gap:9px;margin:18px 0}
+    .pill{border:1px solid var(--line);background:rgba(255,255,255,.5);padding:7px 10px;border-radius:999px;font-size:.82rem;color:var(--muted)}
+    .pill.live{border-color:#8caf9e;color:#194f3e;background:#edf7f2}
+    .pill.demo{border-color:#d8aa6b;color:#76501d;background:#fff5e7}
+    nav{display:flex;gap:6px;overflow:auto;margin:4px 0 18px;padding-bottom:2px}
+    nav button{border:0;background:transparent;padding:10px 13px;border-radius:9px;cursor:pointer;color:var(--muted);font-weight:700;white-space:nowrap}
+    nav button.active{background:var(--soft);color:var(--ink)}
+    .hero-card{background:var(--accent2);color:white;border-radius:22px;padding:24px;margin:10px 0 22px;display:grid;grid-template-columns:1.5fr .8fr;gap:20px;box-shadow:var(--shadow)}
+    .hero-card h2{font-family:Georgia,"Times New Roman",serif;font-size:2rem;margin:.35rem 0 .7rem}
+    .hero-card p{margin:0;color:#d7e3df;line-height:1.55}
+    .hero-stat{border-left:1px solid rgba(255,255,255,.25);padding-left:20px;display:flex;flex-direction:column;justify-content:center}
+    .big{font:700 2.8rem Georgia,serif}
+    .story-list{display:grid;gap:12px}
+    .story{background:var(--card);border:1px solid var(--line);border-radius:18px;overflow:hidden;box-shadow:0 5px 16px rgba(27,34,31,.035)}
+    .story-head{display:grid;grid-template-columns:54px 1fr auto;gap:14px;padding:20px;align-items:start;cursor:pointer}
+    .rank{font:700 2rem Georgia,serif;color:var(--accent)}
+    .category{font-size:.73rem;text-transform:uppercase;letter-spacing:.11em;font-weight:800;color:var(--muted)}
+    .title{font-family:Georgia,"Times New Roman",serif;font-size:1.5rem;line-height:1.15;margin:4px 0 8px}
+    .korean{font-size:.91rem;color:var(--muted);margin-bottom:8px}
+    .summary{line-height:1.55;color:#35413c}
+    .chev{font-size:1.3rem;color:var(--muted);transition:transform .2s}
+    .story.open .chev{transform:rotate(180deg)}
+    .story-body{display:none;border-top:1px solid var(--line);padding:18px 20px 20px 88px;background:#fffcf6}
+    .story.open .story-body{display:block}
+    .why{padding:12px 14px;background:var(--soft);border-radius:12px;line-height:1.5;margin-bottom:14px}
+    .why b{display:block;margin-bottom:4px}
+    .source-row{display:flex;gap:7px;flex-wrap:wrap;margin:10px 0 4px}
+    .source{font-size:.8rem;border:1px solid var(--line);padding:6px 9px;border-radius:999px;text-decoration:none;background:white}
+    .views{margin-top:15px;display:grid;gap:9px}
+    .view{border-left:3px solid var(--line);padding:4px 0 4px 11px;line-height:1.45}
+    .view b{font-size:.86rem}
+    .life-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}
+    .life{background:var(--card);border:1px solid var(--line);padding:18px;border-radius:16px}
+    .life h3{font-family:Georgia,serif;margin:.25rem 0 .5rem}
+    footer{color:var(--muted);font-size:.82rem;line-height:1.5;border-top:1px solid var(--line);margin-top:28px;padding:18px 0 30px}
+    .hidden{display:none!important}
+    .error{background:#fff0ee;border:1px solid #efb3aa;color:#7d2920;padding:11px 13px;border-radius:10px;margin-bottom:14px}
+
+    .deep-actions{margin-top:16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    .deep-btn{border:0;background:var(--accent);color:white;padding:10px 14px;border-radius:999px;font-weight:800;cursor:pointer}
+    .deep-btn:hover{filter:brightness(.96)}
+    .deep-btn[disabled]{opacity:.58;cursor:wait}
+    .deep-note{font-size:.78rem;color:var(--muted)}
+    .deep-panel{margin-top:16px;border:1px solid var(--line);border-radius:16px;background:white;padding:18px;box-shadow:0 7px 18px rgba(27,34,31,.045)}
+    .deep-panel.hidden{display:none}
+    .deep-kicker{font-size:.72rem;text-transform:uppercase;letter-spacing:.12em;font-weight:900;color:var(--accent);margin-bottom:5px}
+    .deep-panel h3{font-family:Georgia,"Times New Roman",serif;font-size:1.45rem;margin:.1rem 0 .8rem}
+    .deep-panel h4{font-size:.88rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:18px 0 7px}
+    .deep-panel p{line-height:1.62;margin:0;color:#31403a}
+    .deep-panel ul{margin:7px 0 0;padding-left:20px}
+    .deep-panel li{margin:7px 0;line-height:1.5}
+    .deep-source-row{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+
+    @media(max-width:720px){
+      .shell{padding:15px}
+      header{display:block}
+      .refresh{margin-top:15px}
+      .hero-card{grid-template-columns:1fr}
+      .hero-stat{border-left:0;border-top:1px solid rgba(255,255,255,.25);padding:16px 0 0}
+      .story-head{grid-template-columns:42px 1fr auto;padding:16px 14px}
+      .rank{font-size:1.65rem}
+      .title{font-size:1.28rem}
+      .story-body{padding:15px}
+      .life-grid{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+<div class="shell">
+  <header>
+    <div>
+      <div class="eyebrow">대한민국 · Korea</div>
+      <h1>Korean Morning Papers</h1>
+      <div class="dek">What Korea is talking about today — major Korean-language stories, translated into clear English, with context and contrasting newspaper viewpoints.</div>
+    </div>
+    <button id="refresh" class="refresh">↻ Refresh briefing</button>
+  </header>
+
+  <div id="error" class="error hidden"></div>
+
+  <div class="statusbar">
+    <span id="mode" class="pill demo">DEMO BRIEFING</span>
+    <span id="date" class="pill">Korea time</span>
+    <span id="scan" class="pill">Sample edition</span>
+  </div>
+
+  <nav>
+    <button class="active" data-tab="top">Top 10</button>
+    <button data-tab="life">Life in Korea</button>
+    <button data-tab="views">Viewpoints</button>
+  </nav>
+
+  <main>
+    <section id="top-panel">
+      <div class="hero-card">
+        <div>
+          <div class="eyebrow" style="color:#c7dfd7">The morning read</div>
+          <h2 id="lead-title">Ten stories, not ten newspapers.</h2>
+          <p id="lead-text">The app groups duplicate coverage into real-world stories, then explains what matters — so you see the Korean conversation rather than a pile of translated headlines.</p>
+        </div>
+        <div class="hero-stat">
+          <div class="big" id="article-count">126</div>
+          <div>articles → 10 stories</div>
+        </div>
+      </div>
+      <div id="stories" class="story-list"></div>
+    </section>
+
+    <section id="life-panel" class="hidden">
+      <div class="hero-card">
+        <div>
+          <div class="eyebrow" style="color:#c7dfd7">Beyond the headlines</div>
+          <h2>What does Korea feel like now?</h2>
+          <p>Social change, neighborhoods, aging, education, religion, food, transportation and the small stories that reveal everyday Korean life.</p>
+        </div>
+        <div class="hero-stat"><div class="big">생활</div><div>saenghwal · daily life</div></div>
+      </div>
+      <div id="life-grid" class="life-grid"></div>
+    </section>
+
+    <section id="views-panel" class="hidden">
+      <div class="hero-card">
+        <div>
+          <div class="eyebrow" style="color:#c7dfd7">How Korea is talking</div>
+          <h2>Same story. Different frame.</h2>
+          <p>Compare emphasis across progressive, conservative and wire-service reporting without reducing every disagreement to a simplistic left/right score.</p>
+        </div>
+        <div class="hero-stat"><div class="big">視角</div><div>perspective matters</div></div>
+      </div>
+      <div id="views-list" class="story-list"></div>
+    </section>
+  </main>
+
+  <footer>
+    Prototype: summaries are designed for discovery and context, not to reproduce full articles. Original publisher links are preserved. In live mode, credentials remain server-side in Netlify environment variables.
+  </footer>
+</div>
+
+<script>
+const DEMO = {
+  mode:"demo",
+  generatedAt:"2026-08-10T00:40:00+09:00",
+  articlesScanned:126,
+  outlets:["연합뉴스","한겨레","경향신문","조선일보","중앙일보","동아일보"],
+  stories:[
+    {rank:1,category:"Weather",title_en:"Extreme heat remains a national story as conditions begin to shift",title_ko:"폭염 장기화…일부 지역 비와 기온 변화",summary:"Korean outlets continue to give heavy attention to prolonged heat, tropical nights and regional rainfall, with practical concern about health, electricity demand and agriculture.",why:"Weather is not being treated as filler: it is affecting daily routines, public health and the broader discussion of climate resilience.",sources:[{name:"연합뉴스",url:"https://www.yna.co.kr/"},{name:"한겨레",url:"https://www.hani.co.kr/"}],viewpoints:[{outlet:"Yonhap",text:"Focuses on forecasts, warnings and measurable conditions."},{outlet:"Hankyoreh",text:"More likely to connect prolonged extremes with climate-policy questions."}]},
+    {rank:2,category:"Climate",title_en:"Drought pressure grows in parts of southern Korea",title_ko:"남부 지역 가뭄 우려…저수율과 용수 대책 주목",summary:"Low rainfall and reservoir levels are becoming a second major weather concern, particularly in southern regions.",why:"Heat plus drought creates a compound problem for water supply, agriculture and local governments.",sources:[{name:"경향신문",url:"https://www.khan.co.kr/"},{name:"연합뉴스",url:"https://www.yna.co.kr/"}],viewpoints:[{outlet:"Kyunghyang",text:"Emphasizes environmental and public-policy implications."},{outlet:"Yonhap",text:"Centers official measurements and government response."}]},
+    {rank:3,category:"Housing",title_en:"Housing supply and Seoul prices remain politically charged",title_ko:"주택 공급 대책과 수도권 집값 논쟁",summary:"Coverage is focused on whether additional housing supply can cool pressure in Seoul and the capital region without producing another policy whiplash.",why:"Housing affordability is one of the clearest places where national economics becomes a daily household issue.",sources:[{name:"중앙일보",url:"https://www.joongang.co.kr/"},{name:"한겨레",url:"https://www.hani.co.kr/"}],viewpoints:[{outlet:"JoongAng",text:"Often foregrounds market reaction and implementation risk."},{outlet:"Hankyoreh",text:"Often stresses supply, affordability and public-sector responsibility."}]},
+    {rank:4,category:"Politics",title_en:"Governing-party leadership contest draws close attention",title_ko:"여당 지도부 경쟁…당심과 민심의 향방",summary:"The internal race is being read not merely as a personnel contest but as a clue to how the governing party will position itself toward the administration and opposition.",why:"Party leadership can shape legislation, appointments and the tone of national politics.",sources:[{name:"조선일보",url:"https://www.chosun.com/"},{name:"경향신문",url:"https://www.khan.co.kr/"}],viewpoints:[{outlet:"Chosun",text:"Likely to scrutinize factional power and implications for the presidency."},{outlet:"Kyunghyang",text:"More likely to examine ideological direction and reform promises."}]},
+    {rank:5,category:"Economy",title_en:"Tax and investment proposals face investor and political pushback",title_ko:"세제·투자 정책 조정론…시장 반응 주시",summary:"Policy makers are facing pressure to recalibrate proposals affecting investment and household finance after criticism from market participants.",why:"It is a test of how the government balances redistribution, revenue and its desire for a stronger domestic capital market.",sources:[{name:"동아일보",url:"https://www.donga.com/"},{name:"중앙일보",url:"https://www.joongang.co.kr/"}],viewpoints:[{outlet:"Dong-A",text:"Tends to foreground market confidence and unintended economic effects."},{outlet:"JoongAng",text:"Often emphasizes investor behavior and policy predictability."}]},
+    {rank:6,category:"Justice",title_en:"Korea continues debating a major restructuring of investigative power",title_ko:"수사권 개편과 검찰 제도 변화 논쟁",summary:"Changes to the division of investigative authority among prosecutors, police and other bodies remain a consequential institutional story.",why:"This is about who has the power to investigate whom — a recurring fault line in modern Korean politics.",sources:[{name:"동아일보",url:"https://www.donga.com/"},{name:"한겨레",url:"https://www.hani.co.kr/"}],viewpoints:[{outlet:"Dong-A",text:"Often stresses operational risk, continuity and checks on political power."},{outlet:"Hankyoreh",text:"Often situates reform in the history of prosecutorial power and accountability."}]},
+    {rank:7,category:"Society",title_en:"Police conflict-of-interest safeguards receive scrutiny",title_ko:"경찰 이해충돌 방지와 사건 회피 제도",summary:"Cases involving possible family or personal conflicts are prompting attention to stronger recusal and transfer procedures.",why:"The details are bureaucratic, but the underlying issue is public trust in impartial investigation.",sources:[{name:"연합뉴스",url:"https://www.yna.co.kr/"}],viewpoints:[{outlet:"Yonhap",text:"Primarily reports the rules, numbers and official response."}]},
+    {rank:8,category:"Demographics",title_en:"Shrinking youth population forces another look at military manpower",title_ko:"병역 자원 감소…인구절벽 속 병력 운영 고민",summary:"Korea's demographic decline is increasingly colliding with the manpower needs of a conscription-based military.",why:"This connects three huge Korean questions at once: fertility, national security and the burden placed on young adults.",sources:[{name:"조선일보",url:"https://www.chosun.com/"},{name:"연합뉴스",url:"https://www.yna.co.kr/"}],viewpoints:[{outlet:"Chosun",text:"Often foregrounds readiness and security consequences."},{outlet:"Yonhap",text:"Focuses on manpower projections and official proposals."}]},
+    {rank:9,category:"Sports & Governance",title_en:"Football governance remains under a harsh spotlight",title_ko:"축구협회 운영과 감독 선임 논란 지속",summary:"Questions about process, leadership and accountability inside Korean football continue to spill well beyond the sports pages.",why:"National-team football carries unusual cultural weight in Korea, turning governance failures into a public-accountability story.",sources:[{name:"연합뉴스",url:"https://www.yna.co.kr/"},{name:"중앙일보",url:"https://www.joongang.co.kr/"}],viewpoints:[{outlet:"Yonhap",text:"Tracks investigations and official statements."},{outlet:"JoongAng",text:"Adds institutional and public-reaction analysis."}]},
+    {rank:10,category:"World",title_en:"Korean papers watch global wars through a Korean security lens",title_ko:"국제 분쟁 장기화…한국 안보·방산 영향 주목",summary:"International conflict coverage frequently asks a second question: what does this mean for the U.S. alliance, ammunition stocks, energy prices and Korea's own defense industry?",why:"Foreign news in Korea is often domestic news in disguise because alliance policy, North Korea and trade are so closely linked.",sources:[{name:"동아일보",url:"https://www.donga.com/"},{name:"조선일보",url:"https://www.chosun.com/"}],viewpoints:[{outlet:"Dong-A",text:"Often emphasizes alliance and strategic consequences."},{outlet:"Chosun",text:"Often highlights military readiness and geopolitical risk."}]}
+  ],
+  life:[
+    {tag:"Everyday Korea",title:"Why 'tropical nights' became a daily-life phrase",text:"A social lens on how heat changes sleep, commuting, outdoor exercise and electricity use."},
+    {tag:"Demographics",title:"The shrinking school-age population",text:"Closures, mergers and changing neighborhoods make the fertility story visible at street level."},
+    {tag:"Culture",title:"What younger Koreans expect from work",text:"Coverage of hours, hierarchy and job security reveals a workplace culture still changing quickly."},
+    {tag:"Cities",title:"Seoul housing isn't just a real-estate story",text:"Rent, commute length and access to family increasingly shape where younger households can live."}
+  ]
+};
+
+let data = DEMO;
+
+function fmtKoreaDate(iso){
+  try{
+    return new Intl.DateTimeFormat("en-US",{timeZone:"Asia/Seoul",weekday:"long",month:"long",day:"numeric",year:"numeric"}).format(new Date(iso));
+  }catch(e){return "Korea time"}
+}
+
+function escapeHtml(s=""){
+  return s.replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c]));
+}
+
+function render(){
+  document.getElementById("mode").textContent = data.mode==="live" ? "LIVE BRIEFING" : "DEMO BRIEFING";
+  document.getElementById("mode").className = "pill " + (data.mode==="live" ? "live":"demo");
+  document.getElementById("date").textContent = fmtKoreaDate(data.generatedAt);
+  document.getElementById("scan").textContent = data.mode==="live"
+    ? `${data.outlets?.length || 0} source families · ${data.articlesScanned || 0} articles`
+    : "Sample edition · live backend ready";
+  document.getElementById("article-count").textContent = data.articlesScanned || "—";
+
+  const stories = document.getElementById("stories");
+  stories.innerHTML = data.stories.map((s,i)=>storyCard(s,i)).join("");
+  stories.querySelectorAll(".story-head").forEach(h=>h.addEventListener("click",()=>h.parentElement.classList.toggle("open")));
+
+  document.getElementById("life-grid").innerHTML = (data.life || DEMO.life).map(x=>`
+    <article class="life"><div class="category">${escapeHtml(x.tag||"Life")}</div>
+    <h3>${escapeHtml(x.title)}</h3><div class="summary">${escapeHtml(x.text)}</div></article>`).join("");
+
+  const withViews = data.stories.filter(s=>s.viewpoints && s.viewpoints.length);
+  document.getElementById("views-list").innerHTML = withViews.slice(0,6).map((s,i)=>storyCard(s,i,true)).join("");
+  document.querySelectorAll("#views-list .story-head").forEach(h=>h.addEventListener("click",()=>h.parentElement.classList.toggle("open")));
+}
+
+
+function demoDeepDive(s){
+  const tailored = {
+    "Weather":{
+      overview:"This is bigger than a one-day forecast. Korean coverage is treating the heat as a public-health, energy and climate-resilience problem, not merely uncomfortable weather.",
+      background:["Korea's dense cities retain heat overnight, making tropical nights especially disruptive.","Older adults, outdoor workers and people without reliable cooling face the greatest health risk.","Power demand and agricultural damage make prolonged heat an economic story as well as a weather story."],
+      nuances:["A cooler day does not necessarily mean the heat wave has ended; humidity and nighttime temperatures matter.","Different outlets may emphasize immediate safety, climate policy, or the government's preparedness."],
+      uncertainty:["The timing and geographic extent of meaningful relief can shift quickly with rain bands and humidity."],
+      watch:["Whether nighttime temperatures fall consistently.","Any strain on electricity demand, agriculture or emergency services."]
+    },
+    "Climate":{
+      overview:"The drought story matters because it can persist even when isolated rain arrives. Reservoirs, soil moisture and regional water systems recover more slowly than headlines do.",
+      background:["Southern regions can experience very different rainfall patterns from Seoul and the central region.","Water shortages affect households, farms and industry in different ways, so local policy responses may vary."],
+      nuances:["A heavy storm can reduce short-term pressure without fully repairing a seasonal rainfall deficit.","Coverage may differ over whether the main problem is climate adaptation, infrastructure, or water-management policy."],
+      uncertainty:["Reservoir recovery depends on where rain falls, not just national rainfall totals."],
+      watch:["Reservoir levels and municipal conservation measures.","Whether drought restrictions spread or ease."]
+    },
+    "Housing":{
+      overview:"Housing policy in Korea is unusually sensitive because small changes in supply, lending, tax or redevelopment rules can quickly affect expectations in Seoul and the capital region.",
+      background:["Seoul housing is tightly linked to school districts, commuting, family wealth and intergenerational inequality.","Governments repeatedly face the tension between cooling speculation and expanding supply."],
+      nuances:["More announced supply does not equal immediate housing; construction timelines matter.","Measures that help buyers can also increase demand and push prices higher if supply remains tight."],
+      uncertainty:["Markets often react to expected policy before the policy itself takes effect."],
+      watch:["Specific sites, construction timelines and financing rules.","Whether rents and sale prices move in the same direction."]
+    },
+    "Politics":{
+      overview:"An internal party leadership race can shape much more than party personnel. It affects legislative strategy, relations with the president, candidate recruitment and how aggressively the party confronts the opposition.",
+      background:["Korean parties often contain strong internal factions and regional voting patterns.","Leadership elections can reveal where activists and ordinary supporters differ."],
+      nuances:["Headline vote totals may hide differences between party members, delegates and public polling.","Newspaper framing can focus on ideology, factional power, or implications for the administration."],
+      uncertainty:["Late regional votes and turnout can change the apparent momentum quickly."],
+      watch:["Results in the remaining large voting blocs.","Whether the winner seeks unity or factional consolidation."]
+    },
+    "Economy":{
+      overview:"The underlying question is policy credibility: can the government change tax and investment rules without creating the sense that the rules of the market are constantly moving?",
+      background:["Korean households are highly attentive to tax-advantaged savings and investment vehicles.","The government also wants domestic capital markets to become more attractive and transparent."],
+      nuances:["A proposal can be economically defensible yet still fail if investors believe implementation will be unpredictable.","Newspapers may differ sharply over whether a reversal shows pragmatism or policy confusion."],
+      uncertainty:["Final legislation may differ substantially from early proposals."],
+      watch:["The revised bill language.","Market reaction after details are formally announced."]
+    }
+  };
+  const d = tailored[s.category] || {
+    overview:"This story becomes more useful when viewed as part of a larger Korean institutional and social context rather than as a single headline.",
+    background:["The immediate event is only one layer; Korean coverage often assumes readers already know the political or institutional history behind it.","Different outlets may agree on the facts while emphasizing very different consequences."],
+    nuances:["Watch for differences between what officials say, what has actually been implemented, and what critics predict.","A single headline can overstate consensus, so comparing several outlets helps."],
+    uncertainty:["Some facts, motives or consequences may remain unsettled while the story is developing."],
+    watch:["Whether official policy changes follow the controversy.","How coverage changes once more evidence or data becomes available."]
+  };
+  return {
+    headline:s.title_en,
+    overview:d.overview,
+    background:d.background,
+    nuances:d.nuances,
+    uncertainty:d.uncertainty,
+    watch:d.watch,
+    sources:s.sources || []
+  };
+}
+
+function deepHtml(d){
+  const list = x => (x && x.length) ? `<ul>${x.map(v=>`<li>${escapeHtml(v)}</li>`).join("")}</ul>` : "";
+  const links=(d.sources||[]).map(src=>`<a class="source" target="_blank" rel="noopener" href="${escapeHtml(src.url||"#")}">${escapeHtml(src.name||"Source")} ↗</a>`).join("");
+  return `<div class="deep-kicker">Go deeper</div>
+    <h3>${escapeHtml(d.headline || "Deeper context")}</h3>
+    <p>${escapeHtml(d.overview || "")}</p>
+    ${d.background?.length ? `<h4>Background</h4>${list(d.background)}` : ""}
+    ${d.nuances?.length ? `<h4>Nuance & competing interpretations</h4>${list(d.nuances)}` : ""}
+    ${d.uncertainty?.length ? `<h4>What is still uncertain</h4>${list(d.uncertainty)}` : ""}
+    ${d.watch?.length ? `<h4>What to watch next</h4>${list(d.watch)}` : ""}
+    ${links ? `<h4>Related Korean coverage</h4><div class="deep-source-row">${links}</div>` : ""}`;
+}
+
+async function goDeeper(btn, storyIndex){
+  const story = data.stories[storyIndex];
+  const panel = btn.closest(".story-body").querySelector(".deep-panel");
+  if(!panel) return;
+
+  if(panel.dataset.loaded === "1"){
+    panel.classList.toggle("hidden");
+    btn.textContent = panel.classList.contains("hidden") ? "Go deeper" : "Hide deeper view";
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = "Reading more Korean coverage…";
+  panel.classList.remove("hidden");
+  panel.innerHTML = `<div class="deep-kicker">Go deeper</div><p>Building a fuller briefing from additional Korean coverage…</p>`;
+
+  try{
+    let deep;
+    if(data.mode === "live"){
+      const r = await fetch("/.netlify/functions/deeper",{
+        method:"POST",
+        headers:{"content-type":"application/json"},
+        body:JSON.stringify({
+          title_ko:story.title_ko,
+          title_en:story.title_en,
+          summary:story.summary,
+          category:story.category
+        })
+      });
+      const body = await r.json();
+      if(!r.ok) throw new Error(body.error || "Could not build deeper briefing.");
+      deep = body;
+    }else{
+      deep = demoDeepDive(story);
+    }
+    panel.innerHTML = deepHtml(deep);
+    panel.dataset.loaded = "1";
+    btn.textContent = "Hide deeper view";
+  }catch(e){
+    panel.innerHTML = `<div class="deep-kicker">Go deeper</div><p>${escapeHtml(e.message)} The short briefing above is still available.</p>`;
+    btn.textContent = "Try again";
+  }finally{
+    btn.disabled = false;
+  }
+}
+
+function storyCard(s,i,forceOpen=false){
+  const sources = (s.sources||[]).map(src=>`<a class="source" target="_blank" rel="noopener" href="${escapeHtml(src.url||"#")}">${escapeHtml(src.name||"Source")} ↗</a>`).join("");
+  const views = (s.viewpoints||[]).map(v=>`<div class="view"><b>${escapeHtml(v.outlet)}</b><br>${escapeHtml(v.text)}</div>`).join("");
+  return `<article class="story ${forceOpen?"open":""}">
+    <div class="story-head">
+      <div class="rank">${String(s.rank ?? i+1).padStart(2,"0")}</div>
+      <div>
+        <div class="category">${escapeHtml(s.category||"News")}</div>
+        <div class="title">${escapeHtml(s.title_en||s.title||"")}</div>
+        ${s.title_ko ? `<div class="korean" lang="ko">${escapeHtml(s.title_ko)}</div>`:""}
+        <div class="summary">${escapeHtml(s.summary||"")}</div>
+      </div>
+      <div class="chev">⌄</div>
+    </div>
+    <div class="story-body">
+      <div class="why"><b>Why it matters</b>${escapeHtml(s.why||"")}</div>
+      <div class="category">Coverage sampled</div>
+      <div class="source-row">${sources || "<span class='source'>Source links unavailable</span>"}</div>
+      ${views ? `<div class="views"><div class="category">How Korea is talking about it</div>${views}</div>`:""}
+      <div class="deep-actions">
+        <button class="deep-btn" onclick="event.stopPropagation();goDeeper(this,${i})">Go deeper</button>
+        <span class="deep-note">Background, nuance, uncertainty & what to watch</span>
+      </div>
+      <div class="deep-panel hidden"></div>
+    </div>
+  </article>`;
+}
+
+async function refreshLive(){
+  const btn=document.getElementById("refresh");
+  const err=document.getElementById("error");
+  btn.disabled=true; btn.textContent="Building briefing…"; err.classList.add("hidden");
+  try{
+    const r=await fetch("/.netlify/functions/brief",{cache:"no-store"});
+    const body=await r.json();
+    if(!r.ok) throw new Error(body.error || "Live briefing unavailable.");
+    data={...body,life:DEMO.life,mode:"live"};
+    render();
+  }catch(e){
+    err.textContent = e.message + " Showing the built-in demo instead.";
+    err.classList.remove("hidden");
+    data=DEMO; render();
+  }finally{
+    btn.disabled=false; btn.textContent="↻ Refresh briefing";
+  }
+}
+
+document.getElementById("refresh").addEventListener("click",refreshLive);
+document.querySelectorAll("nav button").forEach(btn=>btn.addEventListener("click",()=>{
+  document.querySelectorAll("nav button").forEach(b=>b.classList.remove("active")); btn.classList.add("active");
+  ["top","life","views"].forEach(t=>document.getElementById(t+"-panel").classList.toggle("hidden",t!==btn.dataset.tab));
+}));
+render();
+</script>
+</body>
+</html>
