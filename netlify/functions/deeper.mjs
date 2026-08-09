@@ -1,6 +1,6 @@
 import { generateJson } from "./_shared/ai.mjs";
 
-const NAVER_URL = "https://openapi.naver.com/v1/search/news.json";
+const NAVER_URL = "https://naverapihub.apigw.ntruss.com/search/v1/news";
 
 function clean(s = "") {
   return s
@@ -35,11 +35,12 @@ async function naverSearch(query, display = 40) {
   u.searchParams.set("query", query);
   u.searchParams.set("display", String(display));
   u.searchParams.set("sort", "date");
+  u.searchParams.set("format", "json");
 
   const r = await fetch(u, {
     headers: {
-      "X-Naver-Client-Id": id,
-      "X-Naver-Client-Secret": secret
+      "X-NCP-APIGW-API-KEY-ID": id,
+      "X-NCP-APIGW-API-KEY": secret
     }
   });
   if (!r.ok) throw new Error(`Naver API ${r.status}: ${(await r.text()).slice(0,500)}`);
