@@ -3,6 +3,32 @@ import { generateJsonWithWeb } from "./_shared/ai.mjs";
 
 const STORE_NAME = "korean-morning-papers";
 
+const DEEP_SCHEMA = {
+  type: "object",
+  properties: {
+    headline: { type: "string" },
+    overview: { type: "string" },
+    background: { type: "array", items: { type: "string" } },
+    nuances: { type: "array", items: { type: "string" } },
+    uncertainty: { type: "array", items: { type: "string" } },
+    watch: { type: "array", items: { type: "string" } },
+    sources: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          name: { type: "string" },
+          url: { type: "string" }
+        },
+        required: ["name", "url"],
+        additionalProperties: false
+      }
+    }
+  },
+  required: ["headline", "overview", "background", "nuances", "uncertainty", "watch", "sources"],
+  additionalProperties: false
+};
+
 async function analyze(story) {
   const prompt = `You are producing the "Go deeper" section for Korean Morning Papers.
 
@@ -19,18 +45,9 @@ Be analytical but cautious. Separate:
 
 Do not invent quotations, facts, disagreements, or URLs. Do not copy long passages. If reporting is thin or contradictory, say so clearly.
 
-Return ONLY valid JSON, no Markdown:
-{
-  "headline":"clear English title",
-  "overview":"one substantial paragraph, about 120-180 words",
-  "background":["3-5 concise bullets"],
-  "nuances":["3-5 concise bullets about tensions, tradeoffs, or differing interpretations"],
-  "uncertainty":["1-3 bullets on unresolved or unclear points"],
-  "watch":["2-4 bullets on what developments would matter next"],
-  "sources":[{"name":"outlet","url":"https://..."}]
-}`;
+Return only the requested structured deeper briefing.`;
 
-  return generateJsonWithWeb(prompt, 5200, 8);
+  return generateJsonWithWeb(prompt, 5200, 8, DEEP_SCHEMA);
 }
 
 export default async function handler(req) {
