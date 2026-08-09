@@ -32,58 +32,72 @@ async function callAnthropic({ prompt, maxTokens, webSearch = false, maxSearches
     .replace(/\/$/, "");
   const usingNetlifyGateway = Boolean(process.env.ANTHROPIC_BASE_URL);
   const model = process.env.ANTHROPIC_MODEL || "claude-sonnet-5";
+  const messages = [{ role: "user", content: prompt }];
 
-  const body = {
-    model,
-    max_tokens: maxTokens,
-    messages: [{ role: "user", content: prompt }]
-  };
-
-  if (webSearch) {
-    body.tools = [{
-      type: "web_search_20250305",
-      name: "web_search",
-      max_uses: maxSearches,
-      user_location: {
-        type: "approximate",
-        city: "Seoul",
-        country: "KR",
-        timezone: "Asia/Seoul"
-      }
-    }];
-  }
-
-  const r = await fetch(`${baseUrl}/v1/messages`, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-api-key": key,
-      "anthropic-version": "2023-06-01"
-    },
-    body: JSON.stringify(body)
-  });
-
-  if (!r.ok) {
-    const text = await r.text();
-    if (r.status === 401) {
-      throw new Error(
-        usingNetlifyGateway
-          ? `Netlify AI Gateway authentication failed. ${text.slice(0, 500)}`
-          : `Anthropic rejected the API key. ${text.slice(0, 500)}`
-      );
+  const tools = webSearch ? [{
+    type: "web_search_20250305",
+    name: "web_search",
+    max_uses: maxSearches,
+    user_location: {
+      type: "approximate",
+      city: "Seoul",
+      country: "KR",
+      timezone: "Asia/Seoul"
     }
-    throw new Error(`${usingNetlifyGateway ? "Netlify AI Gateway" : "Anthropic API"} ${r.status}: ${text.slice(0, 700)}`);
+  }] : undefined;
+
+  const textParts = [];
+
+  for (let turn = 0; turn < 6; turn++) {
+    const body = {
+      model,
+      max_tokens: maxTokens,
+      messages
+    };
+    if (tools) body.tools = tools;
+
+    const r = await fetch(`${baseUrl}/v1/messages`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": key,
+        "anthropic-version": "2023-06-01"
+      },
+      body: JSON.stringify(body)
+    });
+
+    if (!r.ok) {
+      const text = await r.text();
+      if (r.status === 401) {
+        throw new Error(
+          usingNetlifyGateway
+            ? `Netlify AI Gateway authentication failed. ${text.slice(0, 500)}`
+            : `Anthropic rejected the API key. ${text.slice(0, 500)}`
+        );
+      }
+      throw new Error(`${usingNetlifyGateway ? "Netlify AI Gateway" : "Anthropic API"} ${r.status}: ${text.slice(0, 700)}`);
+    }
+
+    const out = await r.json();
+    const piece = anthropicText(out);
+    if (piece) textParts.push(piece);
+
+    if (out.stop_reason === "pause_turn") {
+      messages.push({ role: "assistant", content: out.content || [] });
+      continue;
+    }
+
+    const text = textParts.join("\n").trim();
+    if (!text) throw new Error("Anthropic returned no text output.");
+
+    return {
+      provider: usingNetlifyGateway ? "anthropic via netlify" : "anthropic",
+      model,
+      text: stripJsonFence(text)
+    };
   }
 
-  const out = await r.json();
-  const text = anthropicText(out);
-  if (!text) throw new Error("Anthropic returned no text output.");
-
-  return {
-    provider: usingNetlifyGateway ? "anthropic via netlify" : "anthropic",
-    model,
-    text: stripJsonFence(text)
-  };
+  throw new Error("Anthropic web search paused too many times before completing.");
 }
 
 export async function generateJson(prompt, maxTokens = 5000) {
