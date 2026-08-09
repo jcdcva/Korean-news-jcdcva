@@ -3,7 +3,7 @@ const PATCH = `<script>
   const current = document.getElementById("refresh");
   if (!current) return;
 
-  // Cloning removes the old synchronous click listener from the static demo.
+  // Cloning removes the old synchronous click listener from the prototype page.
   const btn = current.cloneNode(true);
   current.replaceWith(btn);
   const err = document.getElementById("error");
@@ -26,6 +26,44 @@ const PATCH = `<script>
     } catch {
       el.textContent = "Korea news date";
     }
+  }
+
+  function loadingCard(title, text) {
+    return '<article class="story"><div class="story-head" style="grid-template-columns:1fr"><div>' +
+      '<div class="category">Live edition</div>' +
+      '<div class="title">' + title + '</div>' +
+      '<div class="summary">' + text + '</div>' +
+      '</div></div></article>';
+  }
+
+  function showLoadingState(message = "Checking the latest saved edition…") {
+    const mode = document.getElementById("mode");
+    mode.textContent = "LOADING LIVE BRIEFING";
+    mode.className = "pill live";
+    document.getElementById("scan").textContent = message;
+    document.getElementById("article-count").textContent = "—";
+    document.getElementById("stories").innerHTML = loadingCard(
+      "Loading Korean Morning Papers…",
+      "Looking for the most recent live Korean briefing."
+    );
+    document.getElementById("life-grid").innerHTML = "";
+    document.getElementById("views-list").innerHTML = "";
+    setKoreaDateLabel();
+  }
+
+  function showUnavailableState(message) {
+    const mode = document.getElementById("mode");
+    mode.textContent = "LIVE BRIEFING UNAVAILABLE";
+    mode.className = "pill";
+    document.getElementById("scan").textContent = "No demo edition is being shown";
+    document.getElementById("article-count").textContent = "—";
+    document.getElementById("stories").innerHTML = loadingCard(
+      "No live briefing is loaded yet",
+      message || "Press Refresh briefing to try the live Korean news search again."
+    );
+    document.getElementById("life-grid").innerHTML = "";
+    document.getElementById("views-list").innerHTML = "";
+    setKoreaDateLabel();
   }
 
   async function responseJson(r) {
@@ -63,39 +101,86 @@ const PATCH = `<script>
     throw new Error("The background search did not finish within five minutes.");
   }
 
-  async function refreshInBackground() {
+  function hasLiveBriefing() {
+    return data?.mode === "live" && Array.isArray(data?.stories) && data.stories.length > 0;
+  }
+
+  function applyLiveBriefing(briefing) {
+    data = {
+      ...briefing,
+      life: Array.isArray(briefing?.life) ? briefing.life : [],
+      mode: "live"
+    };
+    render();
+    setKoreaDateLabel();
+  }
+
+  async function refreshInBackground({ automatic = false } = {}) {
+    const hadLive = hasLiveBriefing();
     btn.disabled = true;
-    btn.textContent = "Starting Korean news search…";
+    btn.textContent = automatic ? "Building first live briefing…" : "Starting Korean news search…";
     err.classList.add("hidden");
+
+    if (!hadLive) {
+      showLoadingState("Searching current Korean-language news…");
+    }
 
     try {
       const jobId = crypto.randomUUID();
       await startJob("/.netlify/functions/brief-background", { jobId });
       btn.textContent = "Searching Korean news…";
       const briefing = await pollJob("/.netlify/functions/brief-status", jobId);
-
-      data = {
-        ...briefing,
-        life: (briefing.life && briefing.life.length) ? briefing.life : DEMO.life,
-        mode: "live"
-      };
-      render();
-      setKoreaDateLabel();
+      applyLiveBriefing(briefing);
     } catch (e) {
-      err.textContent = e.message + " Showing the built-in demo instead.";
-      err.classList.remove("hidden");
-      data = DEMO;
-      render();
-      setKoreaDateLabel();
+      if (hadLive) {
+        err.textContent = e.message + " Keeping the most recent live briefing on screen.";
+        err.classList.remove("hidden");
+        setKoreaDateLabel();
+      } else {
+        data = {
+          mode: "empty",
+          generatedAt: new Date().toISOString(),
+          articlesScanned: 0,
+          outlets: [],
+          stories: [],
+          life: []
+        };
+        err.textContent = e.message;
+        err.classList.remove("hidden");
+        showUnavailableState("The live search did not complete. Press Refresh briefing to try again.");
+      }
     } finally {
       btn.disabled = false;
       btn.textContent = "↻ Refresh briefing";
     }
   }
 
-  btn.addEventListener("click", refreshInBackground);
+  async function loadLatestBriefing() {
+    showLoadingState();
+    try {
+      const r = await fetch("/.netlify/functions/latest", { cache: "no-store" });
+      const body = await responseJson(r);
+      if (!r.ok) throw new Error(body.error || "Could not load the latest briefing.");
 
-  // Replace the original synchronous Go deeper handler with a background version too.
+      if (body.available && body.data && Array.isArray(body.data.stories) && body.data.stories.length) {
+        applyLiveBriefing(body.data);
+        return;
+      }
+
+      await refreshInBackground({ automatic: true });
+    } catch (e) {
+      // If retrieving the saved edition fails, still try to build a fresh one.
+      try {
+        await refreshInBackground({ automatic: true });
+      } catch {
+        showUnavailableState(e.message);
+      }
+    }
+  }
+
+  btn.addEventListener("click", () => refreshInBackground({ automatic: false }));
+
+  // Go deeper always uses the live background pipeline. There is no visible demo fallback.
   window.goDeeper = async function(deepBtn, storyIndex) {
     const story = data.stories[storyIndex];
     const panel = deepBtn.closest(".story-body")?.querySelector(".deep-panel");
@@ -113,22 +198,19 @@ const PATCH = `<script>
     panel.innerHTML = '<div class="deep-kicker">Go deeper</div><p>Building a fuller briefing from additional Korean coverage…</p>';
 
     try {
-      let deep;
-      if (data.mode === "live") {
-        const jobId = crypto.randomUUID();
-        await startJob("/.netlify/functions/deeper-background", {
-          jobId,
-          story: {
-            title_ko: story.title_ko,
-            title_en: story.title_en,
-            summary: story.summary,
-            category: story.category
-          }
-        });
-        deep = await pollJob("/.netlify/functions/deeper-status", jobId);
-      } else {
-        deep = demoDeepDive(story);
-      }
+      if (!hasLiveBriefing()) throw new Error("A live briefing must be loaded first.");
+
+      const jobId = crypto.randomUUID();
+      await startJob("/.netlify/functions/deeper-background", {
+        jobId,
+        story: {
+          title_ko: story.title_ko,
+          title_en: story.title_en,
+          summary: story.summary,
+          category: story.category
+        }
+      });
+      const deep = await pollJob("/.netlify/functions/deeper-status", jobId);
 
       panel.innerHTML = deepHtml(deep);
       panel.dataset.loaded = "1";
@@ -141,8 +223,8 @@ const PATCH = `<script>
     }
   };
 
-  // Make the timezone explicit even before the first live refresh.
-  setKoreaDateLabel();
+  // Production startup: restore the most recent real briefing instead of the sample edition.
+  loadLatestBriefing();
 })();
 </script>`;
 
