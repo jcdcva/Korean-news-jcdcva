@@ -16,6 +16,34 @@ const PATCH = `<script>
     catch { throw new Error(\`Server returned \${r.status} but not valid JSON: \${text.slice(0, 180)}\`); }
   }
 
+  async function startJob(endpoint, payload) {
+    const start = await fetch(endpoint, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    if (!start.ok && start.status !== 202) {
+      const body = await responseJson(start);
+      throw new Error(body.error || \`Could not start background job (\${start.status}).\`);
+    }
+  }
+
+  async function pollJob(endpoint, jobId, maxAttempts = 150) {
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      await sleep(2000);
+      const r = await fetch(
+        \`\${endpoint}?jobId=\${encodeURIComponent(jobId)}\`,
+        { cache: "no-store" }
+      );
+      const state = await responseJson(r);
+      if (!r.ok) throw new Error(state.error || \`Background status error (\${r.status}).\`);
+      if (state.status === "done") return state.data;
+      if (state.status === "error") throw new Error(state.error || "The background job failed.");
+    }
+    throw new Error("The background search did not finish within five minutes.");
+  }
+
   async function refreshInBackground() {
     btn.disabled = true;
     btn.textContent = "Starting Korean news search…";
@@ -23,39 +51,9 @@ const PATCH = `<script>
 
     try {
       const jobId = crypto.randomUUID();
-      const start = await fetch("/.netlify/functions/brief-background", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ jobId })
-      });
-
-      if (!start.ok && start.status !== 202) {
-        const body = await responseJson(start);
-        throw new Error(body.error || \`Could not start briefing (\${start.status}).\`);
-      }
-
-      let briefing = null;
-      for (let attempt = 0; attempt < 150; attempt++) {
-        await sleep(2000);
-        btn.textContent = "Searching Korean news…";
-
-        const r = await fetch(
-          \`/.netlify/functions/brief-status?jobId=\${encodeURIComponent(jobId)}\`,
-          { cache: "no-store" }
-        );
-        const state = await responseJson(r);
-
-        if (!r.ok) throw new Error(state.error || \`Briefing status error (\${r.status}).\`);
-        if (state.status === "done") {
-          briefing = state.data;
-          break;
-        }
-        if (state.status === "error") {
-          throw new Error(state.error || "The background briefing failed.");
-        }
-      }
-
-      if (!briefing) throw new Error("The Korean news search did not finish within five minutes.");
+      await startJob("/.netlify/functions/brief-background", { jobId });
+      btn.textContent = "Searching Korean news…";
+      const briefing = await pollJob("/.netlify/functions/brief-status", jobId);
 
       data = {
         ...briefing,
@@ -75,6 +73,52 @@ const PATCH = `<script>
   }
 
   btn.addEventListener("click", refreshInBackground);
+
+  // Replace the original synchronous Go deeper handler with a background version too.
+  window.goDeeper = async function(deepBtn, storyIndex) {
+    const story = data.stories[storyIndex];
+    const panel = deepBtn.closest(".story-body")?.querySelector(".deep-panel");
+    if (!story || !panel) return;
+
+    if (panel.dataset.loaded === "1") {
+      panel.classList.toggle("hidden");
+      deepBtn.textContent = panel.classList.contains("hidden") ? "Go deeper" : "Hide deeper view";
+      return;
+    }
+
+    deepBtn.disabled = true;
+    deepBtn.textContent = "Reading more Korean coverage…";
+    panel.classList.remove("hidden");
+    panel.innerHTML = '<div class="deep-kicker">Go deeper</div><p>Building a fuller briefing from additional Korean coverage…</p>';
+
+    try {
+      let deep;
+      if (data.mode === "live") {
+        const jobId = crypto.randomUUID();
+        await startJob("/.netlify/functions/deeper-background", {
+          jobId,
+          story: {
+            title_ko: story.title_ko,
+            title_en: story.title_en,
+            summary: story.summary,
+            category: story.category
+          }
+        });
+        deep = await pollJob("/.netlify/functions/deeper-status", jobId);
+      } else {
+        deep = demoDeepDive(story);
+      }
+
+      panel.innerHTML = deepHtml(deep);
+      panel.dataset.loaded = "1";
+      deepBtn.textContent = "Hide deeper view";
+    } catch (e) {
+      panel.innerHTML = \`<div class="deep-kicker">Go deeper</div><p>\${escapeHtml(e.message)} The short briefing above is still available.</p>\`;
+      deepBtn.textContent = "Try again";
+    } finally {
+      deepBtn.disabled = false;
+    }
+  };
 })();
 </script>`;
 
