@@ -28,6 +28,20 @@ const PATCH = `<script>
     }
   }
 
+  function setSourceLabel() {
+    const el = document.getElementById("scan");
+    if (!el || data?.mode !== "live") return;
+
+    if (Number.isFinite(data?.rssFeedsHealthy) && data.rssFeedsTotal) {
+      const articleCount = Number(data.rssArticles || data.articlesScanned || 0);
+      el.textContent = \`${data.rssFeedsHealthy}/${data.rssFeedsTotal} RSS feeds · \${articleCount} recent articles · web verification\`;
+      el.title = "RSS headlines are the first-pass intake; Claude web search verifies major stories and fills source gaps.";
+      return;
+    }
+
+    el.textContent = \`${data.outlets?.length || 0} source families · \${data.articlesScanned || 0} articles\`;
+  }
+
   function loadingCard(title, text) {
     return '<article class="story"><div class="story-head" style="grid-template-columns:1fr"><div>' +
       '<div class="category">Live edition</div>' +
@@ -113,6 +127,7 @@ const PATCH = `<script>
     };
     render();
     setKoreaDateLabel();
+    setSourceLabel();
   }
 
   async function refreshInBackground({ automatic = false } = {}) {
@@ -122,13 +137,13 @@ const PATCH = `<script>
     err.classList.add("hidden");
 
     if (!hadLive) {
-      showLoadingState("Searching current Korean-language news…");
+      showLoadingState("Collecting Korean RSS feeds and verifying the news…");
     }
 
     try {
       const jobId = crypto.randomUUID();
       await startJob("/.netlify/functions/brief-background", { jobId });
-      btn.textContent = "Searching Korean news…";
+      btn.textContent = "Reading RSS + checking Korean news…";
       const briefing = await pollJob("/.netlify/functions/brief-status", jobId);
       applyLiveBriefing(briefing);
     } catch (e) {
@@ -136,6 +151,7 @@ const PATCH = `<script>
         err.textContent = e.message + " Keeping the most recent live briefing on screen.";
         err.classList.remove("hidden");
         setKoreaDateLabel();
+        setSourceLabel();
       } else {
         data = {
           mode: "empty",
