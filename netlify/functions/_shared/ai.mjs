@@ -249,7 +249,7 @@ export async function generateJsonWithWeb(prompt, maxTokens = 6000, maxSearches 
     return { ...json, _ai: { provider: result.provider, model: result.model } };
   }
 
-  const researchPrompt = `${prompt}\n\nRESEARCH STAGE ONLY:\nUse web search thoroughly and produce a factual research memo in ordinary prose or Markdown. Do NOT try to produce JSON in this stage. Preserve Korean headlines when useful. Explicitly mention outlet names and source URLs whenever possible. Gather enough evidence for a later formatter to build the requested briefing without searching again.`;
+  const researchPrompt = `${prompt}\n\nRESEARCH STAGE ONLY:\nUse web search strategically to verify, broaden, and fill gaps in the evidence already supplied in the task. Produce a factual research memo in ordinary prose or Markdown. Do NOT try to produce JSON in this stage. Preserve Korean headlines when useful. Explicitly mention outlet names and source URLs whenever possible. Gather enough evidence for a later formatter to build the requested briefing without searching again.`;
 
   const research = await callAnthropic({
     prompt: researchPrompt,
